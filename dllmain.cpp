@@ -8,15 +8,16 @@ GetCursorInfo_t OriginalGetCursorInfo = nullptr;
 
 
 BOOL WINAPI HookedGetCursorInfo(PCURSORINFO pci) {
-    if (pci && pci->cbSize == sizeof(CURSORINFO)) {
-        // BOOL result = OriginalGetCursorInfo(pci);
+    BOOL result = OriginalGetCursorInfo(pci);
+    if (result == true)
+    {
         POINT nypt;
         GetCursorPos(&nypt);
         pci->ptScreenPos.x = nypt.x;
         pci->ptScreenPos.y = nypt.y;
         return true;
     }
-    return FALSE;
+    else return false;
 }
 
 void Setuphook() {
@@ -33,18 +34,9 @@ void Setuphook() {
     if (MH_CreateHook(target, &HookedGetCursorInfo, reinterpret_cast<void**>(&OriginalGetCursorInfo)) != MH_OK) {
         MessageBoxA(NULL, "Failed to create hook", "Error", MB_OK);
     }
-
     if (MH_EnableHook(target) != MH_OK) {
         MessageBoxA(NULL, "Failed to enable hook", "Error", MB_OK);
     }
-
-
-}
-DWORD WINAPI ThreadFunction(LPVOID lpParam)
-{
-	Sleep(2000);
-    Setuphook();
-    return 0;// Wait for 2 seconds to ensure the target process is ready
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
@@ -55,11 +47,7 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     switch (ul_reason_for_call)
     {
     case DLL_PROCESS_ATTACH:
-        // Load dll
         Setuphook();
-       // CreateThread(nullptr, 0,
-       //     (LPTHREAD_START_ROUTINE)ThreadFunction, GetModuleHandle(0), 0, 0); //GetModuleHandle(0)
-        
         break;
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
