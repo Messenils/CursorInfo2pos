@@ -1,10 +1,11 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 #include "pch.h"
-#include "MinHook.h"
+#include "Easyhook.h"
 
 typedef BOOL(WINAPI* GetCursorInfo_t)(PCURSORINFO);
 GetCursorInfo_t OriginalGetCursorInfo = nullptr;
-
+HOOK_TRACE_INFO hHook = { nullptr };
+void** bypass = nullptr;
 
 
 BOOL WINAPI HookedGetCursorInfo(PCURSORINFO pci) {
@@ -22,21 +23,43 @@ BOOL WINAPI HookedGetCursorInfo(PCURSORINFO pci) {
 
 void Setuphook() {
 
-    if (MH_Initialize() != MH_OK) {
-        MessageBoxA(NULL, "Failed to initialize MinHook", "Error", MB_OK);
-	}
     HMODULE hUser32 = GetModuleHandle(L"user32.dll");
     if (!hUser32) MessageBoxA(NULL, "No User32? hooked too early maybe", "Error", MB_OK);
 
     void* target = GetProcAddress(hUser32, "GetCursorInfo");
     if (!target) MessageBoxA(NULL, "GetcursorInfo not found", "Error", MB_OK);
 
-    if (MH_CreateHook(target, &HookedGetCursorInfo, reinterpret_cast<void**>(&OriginalGetCursorInfo)) != MH_OK) {
-        MessageBoxA(NULL, "Failed to create hook", "Error", MB_OK);
+    // Install the hook
+    NTSTATUS result = LhInstallHook(
+        target,
+        HookedGetCursorInfo,
+        nullptr,
+        &hHook
+    );
+
+    if (FAILED(result)) {
+        MessageBoxA(NULL, "Failed to install EasyHook", "Error", MB_OK);
+        return;
     }
-    if (MH_EnableHook(target) != MH_OK) {
-        MessageBoxA(NULL, "Failed to enable hook", "Error", MB_OK);
+
+    
+    
+    if (LhGetHookBypassAddress(&hHook, &bypass) == 0) {
+        OriginalGetCursorInfo = (GetCursorInfo_t)bypass;
     }
+    else {
+        MessageBoxA(NULL, "Failed to get original function pointer", "Error", MB_OK);
+    }
+
+    // Enable the hook for all threads
+    ULONG ACLEntries[1] = { 0 };
+    result = LhSetInclusiveACL(ACLEntries, 1, &hHook);
+
+    if (FAILED(result)) {
+        MessageBoxA(NULL, "Failed to set ACL", "Error", MB_OK);
+        return;
+    }
+
 }
 
 BOOL APIENTRY DllMain( HMODULE hModule,
