@@ -2,14 +2,12 @@
 #include "pch.h"
 #include "Easyhook.h"
 
-typedef BOOL(WINAPI* GetCursorInfo_t)(PCURSORINFO);
-GetCursorInfo_t OriginalGetCursorInfo = nullptr;
 HOOK_TRACE_INFO hHook = { nullptr };
-void** bypass = nullptr;
+BOOL WINAPI HookedGetCursorInfo(PCURSORINFO pci);
 
-
+//n**** All your cursorinfo belong to us!
 BOOL WINAPI HookedGetCursorInfo(PCURSORINFO pci) {
-    BOOL result = OriginalGetCursorInfo(pci);
+    BOOL result = GetCursorInfo(pci);
     if (result == true)
     {
         POINT nypt;
@@ -33,7 +31,7 @@ void Setuphook() {
     NTSTATUS result = LhInstallHook(
         target,
         HookedGetCursorInfo,
-        nullptr,
+        NULL,
         &hHook
     );
 
@@ -42,16 +40,9 @@ void Setuphook() {
         return;
     }
 
-    
-    
-    if (LhGetHookBypassAddress(&hHook, &bypass) == 0) {
-        OriginalGetCursorInfo = (GetCursorInfo_t)bypass;
-    }
-    else {
-        MessageBoxA(NULL, "Failed to get original function pointer", "Error", MB_OK);
-    }
-
-    // Enable the hook for all threads
+    //Activating hook for current thread only
+    //If the threadId in the ACL is set to 0, 
+    //then internally EasyHook uses GetCurrentThreadId()
     ULONG ACLEntries[1] = { 0 };
     result = LhSetInclusiveACL(ACLEntries, 1, &hHook);
 
@@ -75,6 +66,8 @@ BOOL APIENTRY DllMain( HMODULE hModule,
     case DLL_THREAD_ATTACH:
     case DLL_THREAD_DETACH:
     case DLL_PROCESS_DETACH:
+       // LhUninstallHook(&hHook);
+       // LhWaitForPendingRemovals();
         break;
     }
     return TRUE;
